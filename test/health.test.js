@@ -2,16 +2,49 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from '../src/server.js';
 
-test('GET /health returns 200 and status ok', async () => {
+async function withServer(run) {
   const server = createServer();
   await new Promise((resolve) => server.listen(0, resolve));
 
-  const { port } = server.address();
-  const response = await fetch(`http://127.0.0.1:${port}/health`);
-  const body = await response.json();
+  try {
+    const { port } = server.address();
+    await run(`http://127.0.0.1:${port}`);
+  } finally {
+    await new Promise((resolve, reject) => server.close((err) => (err ? reject(err) : resolve())));
+  }
+}
 
-  assert.equal(response.status, 200);
-  assert.deepEqual(body, { status: 'ok' });
+test('GET /health returns 200 and status ok', async () => {
+  await withServer(async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/health`);
+    const body = await response.json();
 
-  await new Promise((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
+    assert.equal(response.status, 200);
+    assert.deepEqual(body, { status: 'ok' });
+  });
+});
+
+test('GET /openapi.json returns OpenAPI JSON with /health', async () => {
+  await withServer(async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/openapi.json`);
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(body.openapi, '3.0.3');
+    assert.ok(body.paths);
+    assert.ok(body.paths['/health']);
+    assert.ok(body.paths['/health'].get);
+  });
+});
+
+test('GET /docs returns Swagger UI HTML', async () => {
+  await withServer(async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/docs`);
+    const html = await response.text();
+
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('content-type'), /text\/html/);
+    assert.match(html, /swagger-ui/i);
+    assert.match(html, /openapi\.json/);
+  });
 });
