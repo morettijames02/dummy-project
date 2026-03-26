@@ -24,7 +24,7 @@ test('GET /health returns 200 and status ok', async () => {
   });
 });
 
-test('GET /openapi.json returns OpenAPI JSON with /health', async () => {
+test('GET /openapi.json returns OpenAPI JSON with auth flow routes', async () => {
   await withServer(async (baseUrl) => {
     const response = await fetch(`${baseUrl}/openapi.json`);
     const body = await response.json();
@@ -33,7 +33,10 @@ test('GET /openapi.json returns OpenAPI JSON with /health', async () => {
     assert.equal(body.openapi, '3.0.3');
     assert.ok(body.paths);
     assert.ok(body.paths['/health']);
-    assert.ok(body.paths['/health'].get);
+    assert.ok(body.paths['/login']);
+    assert.ok(body.paths['/me']);
+    assert.ok(body.paths['/logout']);
+    assert.equal(body.components.securitySchemes.bearerAuth.scheme, 'bearer');
   });
 });
 
