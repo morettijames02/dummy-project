@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
-import { scryptSync, timingSafeEqual } from 'node:crypto';
+import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import swaggerUiDist from 'swagger-ui-dist';
 
@@ -106,7 +106,48 @@ function verifyPassword(password, passwordRecord) {
   return timingSafeEqual(actualHash, expectedHash);
 }
 
-async function handleLogin(req, res) {
+function buildPublicUser(user) {
+  return {
+    email: user.email,
+    name: user.name
+  };
+}
+
+function extractBearerToken(req) {
+  const authorization = req.headers.authorization;
+
+  if (typeof authorization !== 'string') {
+    return null;
+  }
+
+  const [scheme, token] = authorization.split(' ');
+
+  if (scheme !== 'Bearer' || !token) {
+    return null;
+  }
+
+  return token;
+}
+
+function createAuthStore() {
+  const activeTokens = new Map();
+
+  return {
+    issue(user) {
+      const token = randomBytes(24).toString('hex');
+      activeTokens.set(token, buildPublicUser(user));
+      return token;
+    },
+    get(token) {
+      return activeTokens.get(token) ?? null;
+    },
+    revoke(token) {
+      return activeTokens.delete(token);
+    }
+  };
+}
+
+async function handleLogin(req, res, authStore) {
   let rawBody;
 
   try {
@@ -144,16 +185,34 @@ async function handleLogin(req, res) {
     return;
   }
 
+  const token = authStore.issue(user);
+
   sendJson(res, 200, {
     success: true,
-    user: {
-      email: user.email,
-      name: user.name
-    }
+    token,
+    user: buildPublicUser(user)
   });
 }
 
-export function createServer() {
+function authenticateRequest(req, authStore) {
+  const token = extractBearerToken(req);
+
+  if (!token) {
+    return null;
+  }
+
+  const user = authStore.get(token);
+
+  if (!user) {
+    return null;
+  }
+
+  return { token, user };
+}
+
+export function createServer(options = {}) {
+  const authStore = options.authStore ?? createAuthStore();
+
   return http.createServer(async (req, res) => {
     const requestUrl = new URL(req.url, 'http://127.0.0.1');
 
@@ -163,7 +222,32 @@ export function createServer() {
     }
 
     if (req.method === 'POST' && requestUrl.pathname === '/login') {
-      await handleLogin(req, res);
+      await handleLogin(req, res, authStore);
+      return;
+    }
+
+    if (req.method === 'GET' && requestUrl.pathname === '/me') {
+      const session = authenticateRequest(req, authStore);
+
+      if (!session) {
+        sendJson(res, 401, { error: 'unauthorized' });
+        return;
+      }
+
+      sendJson(res, 200, { user: session.user });
+      return;
+    }
+
+    if (req.method === 'POST' && requestUrl.pathname === '/logout') {
+      const session = authenticateRequest(req, authStore);
+
+      if (!session) {
+        sendJson(res, 401, { error: 'unauthorized' });
+        return;
+      }
+
+      authStore.revoke(session.token);
+      sendJson(res, 200, { success: true });
       return;
     }
 
