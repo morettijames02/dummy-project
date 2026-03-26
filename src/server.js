@@ -1,14 +1,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
+import { scryptSync, timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import swaggerUiDist from 'swagger-ui-dist';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const openApiPath = path.join(__dirname, 'openapi.json');
+const usersPath = path.join(__dirname, 'data', 'users.json');
 const swaggerUiPath = swaggerUiDist.getAbsoluteFSPath();
 const openApiDocument = JSON.parse(fs.readFileSync(openApiPath, 'utf8'));
+const dummyUsers = JSON.parse(fs.readFileSync(usersPath, 'utf8'));
 
 function sendJson(res, statusCode, payload) {
   res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -77,12 +80,90 @@ function renderDocsHtml() {
 </html>`;
 }
 
+function readRequestBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
+  });
+}
+
+function verifyPassword(password, passwordRecord) {
+  if (!passwordRecord || passwordRecord.algorithm !== 'scrypt') {
+    return false;
+  }
+
+  const keylen = Number(passwordRecord.keylen);
+  const expectedHash = Buffer.from(passwordRecord.hash, 'hex');
+  const actualHash = scryptSync(password, passwordRecord.salt, keylen);
+
+  if (expectedHash.length !== actualHash.length) {
+    return false;
+  }
+
+  return timingSafeEqual(actualHash, expectedHash);
+}
+
+async function handleLogin(req, res) {
+  let rawBody;
+
+  try {
+    rawBody = await readRequestBody(req);
+  } catch {
+    sendJson(res, 400, { error: 'invalid_request' });
+    return;
+  }
+
+  let body;
+
+  try {
+    body = JSON.parse(rawBody);
+  } catch {
+    sendJson(res, 400, { error: 'invalid_request' });
+    return;
+  }
+
+  if (
+    !body ||
+    typeof body !== 'object' ||
+    typeof body.email !== 'string' ||
+    typeof body.password !== 'string' ||
+    body.email.length === 0 ||
+    body.password.length === 0
+  ) {
+    sendJson(res, 400, { error: 'invalid_request' });
+    return;
+  }
+
+  const user = dummyUsers.find((candidate) => candidate.email === body.email);
+
+  if (!user || !verifyPassword(body.password, user.password)) {
+    sendJson(res, 401, { error: 'invalid_credentials' });
+    return;
+  }
+
+  sendJson(res, 200, {
+    success: true,
+    user: {
+      email: user.email,
+      name: user.name
+    }
+  });
+}
+
 export function createServer() {
-  return http.createServer((req, res) => {
+  return http.createServer(async (req, res) => {
     const requestUrl = new URL(req.url, 'http://127.0.0.1');
 
     if (req.method === 'GET' && requestUrl.pathname === '/health') {
       sendJson(res, 200, { status: 'ok' });
+      return;
+    }
+
+    if (req.method === 'POST' && requestUrl.pathname === '/login') {
+      await handleLogin(req, res);
       return;
     }
 

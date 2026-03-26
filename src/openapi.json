@@ -39,6 +39,115 @@
           }
         }
       }
+    },
+    "/login": {
+      "post": {
+        "summary": "Dummy login",
+        "description": "Authenticates against checked-in dummy user seed data.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "dummy@example.com"
+                  },
+                  "password": {
+                    "type": "string",
+                    "example": "dummy-password"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["success", "user"],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "user": {
+                      "type": "object",
+                      "required": ["email", "name"],
+                      "properties": {
+                        "email": {
+                          "type": "string",
+                          "format": "email",
+                          "example": "dummy@example.com"
+                        },
+                        "name": {
+                          "type": "string",
+                          "example": "Dummy User"
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "user": {
+                    "email": "dummy@example.com",
+                    "name": "Dummy User"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or malformed request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["error"],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "invalid_request"
+                    }
+                  }
+                },
+                "example": {
+                  "error": "invalid_request"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["error"],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "invalid_credentials"
+                    }
+                  }
+                },
+                "example": {
+                  "error": "invalid_credentials"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }
