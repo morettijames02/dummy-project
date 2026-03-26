@@ -1,15 +1,115 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import http from 'node:http';
+import { fileURLToPath } from 'node:url';
+import swaggerUiDist from 'swagger-ui-dist';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const openApiPath = path.join(__dirname, 'openapi.json');
+const swaggerUiPath = swaggerUiDist.getAbsoluteFSPath();
+const openApiDocument = JSON.parse(fs.readFileSync(openApiPath, 'utf8'));
+
+function sendJson(res, statusCode, payload) {
+  res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify(payload));
+}
+
+function sendHtml(res, statusCode, html) {
+  res.writeHead(statusCode, { 'Content-Type': 'text/html; charset=utf-8' });
+  res.end(html);
+}
+
+function sendFile(res, filePath) {
+  try {
+    const data = fs.readFileSync(filePath);
+    const extension = path.extname(filePath);
+    const contentTypes = {
+      '.css': 'text/css; charset=utf-8',
+      '.html': 'text/html; charset=utf-8',
+      '.js': 'application/javascript; charset=utf-8',
+      '.json': 'application/json; charset=utf-8',
+      '.map': 'application/json; charset=utf-8',
+      '.png': 'image/png',
+      '.txt': 'text/plain; charset=utf-8'
+    };
+
+    res.writeHead(200, {
+      'Content-Type': contentTypes[extension] || 'application/octet-stream',
+      'Cache-Control': 'public, max-age=3600'
+    });
+    res.end(data);
+  } catch {
+    sendJson(res, 404, { error: 'not_found' });
+  }
+}
+
+function renderDocsHtml() {
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dummy Project API Docs</title>
+    <link rel="stylesheet" href="/docs/swagger-ui.css" />
+    <link rel="icon" type="image/png" href="/docs/favicon-32x32.png" sizes="32x32" />
+    <link rel="icon" type="image/png" href="/docs/favicon-16x16.png" sizes="16x16" />
+    <style>
+      html { box-sizing: border-box; overflow-y: scroll; }
+      *, *:before, *:after { box-sizing: inherit; }
+      body { margin: 0; background: #fafafa; }
+    </style>
+  </head>
+  <body>
+    <div id="swagger-ui"></div>
+    <script src="/docs/swagger-ui-bundle.js"></script>
+    <script src="/docs/swagger-ui-standalone-preset.js"></script>
+    <script>
+      window.ui = SwaggerUIBundle({
+        url: '/openapi.json',
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+        layout: 'StandaloneLayout'
+      });
+    </script>
+  </body>
+</html>`;
+}
 
 export function createServer() {
   return http.createServer((req, res) => {
-    if (req.method === 'GET' && req.url === '/health') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'ok' }));
+    const requestUrl = new URL(req.url, 'http://127.0.0.1');
+
+    if (req.method === 'GET' && requestUrl.pathname === '/health') {
+      sendJson(res, 200, { status: 'ok' });
       return;
     }
 
-    res.writeHead(404, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'not_found' }));
+    if (req.method === 'GET' && requestUrl.pathname === '/openapi.json') {
+      sendJson(res, 200, openApiDocument);
+      return;
+    }
+
+    if (req.method === 'GET' && requestUrl.pathname === '/docs') {
+      sendHtml(res, 200, renderDocsHtml());
+      return;
+    }
+
+    if (req.method === 'GET' && requestUrl.pathname.startsWith('/docs/')) {
+      const assetName = path.basename(requestUrl.pathname);
+      const assetPath = path.join(swaggerUiPath, assetName);
+
+      if (!assetPath.startsWith(swaggerUiPath)) {
+        sendJson(res, 404, { error: 'not_found' });
+        return;
+      }
+
+      sendFile(res, assetPath);
+      return;
+    }
+
+    sendJson(res, 404, { error: 'not_found' });
   });
 }
 
