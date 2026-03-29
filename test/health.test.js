@@ -24,7 +24,7 @@ test('GET /health returns 200 and status ok', async () => {
   });
 });
 
-test('GET /openapi.json returns OpenAPI JSON with auth flow routes', async () => {
+test('GET /openapi.json returns OpenAPI JSON with auth and product routes', async () => {
   await withServer(async (baseUrl) => {
     const response = await fetch(`${baseUrl}/openapi.json`);
     const body = await response.json();
@@ -35,6 +35,7 @@ test('GET /openapi.json returns OpenAPI JSON with auth flow routes', async () =>
     assert.ok(body.paths['/health']);
     assert.ok(body.paths['/login']);
     assert.ok(body.paths['/me']);
+    assert.ok(body.paths['/products']);
     assert.ok(body.paths['/logout']);
     assert.equal(body.components.securitySchemes.bearerAuth.scheme, 'bearer');
   });
@@ -49,5 +50,6 @@ test('GET /docs returns Swagger UI HTML', async () => {
     assert.match(response.headers.get('content-type'), /text\/html/);
     assert.match(html, /swagger-ui/i);
     assert.match(html, /openapi\.json/);
+    assert.match(html, /SwaggerUIBundle/);
   });
 });

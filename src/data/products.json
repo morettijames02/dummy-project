@@ -1,0 +1,20 @@
+[
+  {
+    "id": "prod_001",
+    "ownerUserId": "user-1",
+    "name": "Alpha Gadget",
+    "description": "Primary demo product for Dummy User"
+  },
+  {
+    "id": "prod_002",
+    "ownerUserId": "user-1",
+    "name": "Beta Widget",
+    "description": "Secondary demo product for Dummy User"
+  },
+  {
+    "id": "prod_003",
+    "ownerUserId": "user-2",
+    "name": "Gamma Tool",
+    "description": "Demo product owned by Owner B"
+  }
+]

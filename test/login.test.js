@@ -14,11 +14,11 @@ async function withServer(run) {
   }
 }
 
-async function login(baseUrl) {
+async function login(baseUrl, credentials = { email: 'dummy@example.com', password: 'dummy-password' }) {
   const response = await fetch(`${baseUrl}/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 'dummy@example.com', password: 'dummy-password' })
+    body: JSON.stringify(credentials)
   });
 
   return {
@@ -36,6 +36,7 @@ test('POST /login returns 200 for valid dummy credentials with bearer token', as
     assert.equal(typeof body.token, 'string');
     assert.ok(body.token.length >= 32);
     assert.deepEqual(body.user, {
+      id: 'user-1',
       email: 'dummy@example.com',
       name: 'Dummy User'
     });
@@ -110,6 +111,7 @@ test('GET /me returns authenticated user for valid bearer token', async () => {
     assert.equal(response.status, 200);
     assert.deepEqual(body, {
       user: {
+        id: 'user-1',
         email: 'dummy@example.com',
         name: 'Dummy User'
       }

@@ -21,9 +21,18 @@ The app starts on `http://localhost:3000` by default.
 - Health check: `GET http://localhost:3000/health`
 - Login: `POST http://localhost:3000/login`
 - Current user: `GET http://localhost:3000/me`
+- Product list: `GET http://localhost:3000/products`
 - Logout: `POST http://localhost:3000/logout`
 - OpenAPI spec: `GET http://localhost:3000/openapi.json`
 - Swagger UI docs: `GET http://localhost:3000/docs`
+
+## Demo users
+
+All demo users use the same password: `dummy-password`
+
+- `dummy@example.com` → has two products
+- `owner-b@example.com` → has one product
+- `empty@example.com` → has no products
 
 ## Verify locally
 
@@ -46,10 +55,13 @@ TOKEN=$(curl -s http://localhost:3000/login \
   | node -e "process.stdin.on('data', d => process.stdout.write(JSON.parse(d).token))")
 ```
 
-6. Call the protected route with the token:
+6. Call the protected routes with the token:
 
 ```bash
 curl http://localhost:3000/me \
+  -H "Authorization: Bearer $TOKEN"
+
+curl http://localhost:3000/products \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -61,10 +73,10 @@ curl http://localhost:3000/logout \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-8. Confirm the token is now invalidated:
+8. Confirm the token is now invalidated for protected routes:
 
 ```bash
-curl -i http://localhost:3000/me \
+curl -i http://localhost:3000/products \
   -H "Authorization: Bearer $TOKEN"
 ```
 

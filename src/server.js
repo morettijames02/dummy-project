@@ -9,9 +9,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const openApiPath = path.join(__dirname, 'openapi.json');
 const usersPath = path.join(__dirname, 'data', 'users.json');
+const productsPath = path.join(__dirname, 'data', 'products.json');
 const swaggerUiPath = swaggerUiDist.getAbsoluteFSPath();
 const openApiDocument = JSON.parse(fs.readFileSync(openApiPath, 'utf8'));
 const dummyUsers = JSON.parse(fs.readFileSync(usersPath, 'utf8'));
+const dummyProducts = JSON.parse(fs.readFileSync(productsPath, 'utf8'));
 
 function sendJson(res, statusCode, payload) {
   res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -108,8 +110,17 @@ function verifyPassword(password, passwordRecord) {
 
 function buildPublicUser(user) {
   return {
+    id: user.id,
     email: user.email,
     name: user.name
+  };
+}
+
+function buildPublicProduct(product) {
+  return {
+    id: product.id,
+    name: product.name,
+    description: product.description
   };
 }
 
@@ -235,6 +246,22 @@ export function createServer(options = {}) {
       }
 
       sendJson(res, 200, { user: session.user });
+      return;
+    }
+
+    if (req.method === 'GET' && requestUrl.pathname === '/products') {
+      const session = authenticateRequest(req, authStore);
+
+      if (!session) {
+        sendJson(res, 401, { error: 'unauthorized' });
+        return;
+      }
+
+      const products = dummyProducts
+        .filter((product) => product.ownerUserId === session.user.id)
+        .map(buildPublicProduct);
+
+      sendJson(res, 200, { products });
       return;
     }
 
